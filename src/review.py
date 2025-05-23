@@ -26,6 +26,7 @@ def review(config):
     identify_test_class = config["configs"]["identifyTestClass"]
     only_new_files = config["configs"]["onlyNewFiles"]
     changes = config['merge']['changes']
+    regex_to_ignore = config["configs"]["regexToIgnore"]
     
     comments = []
 
@@ -44,6 +45,9 @@ def review(config):
 
         file_path = change['new_path']
         if not file_path.lower().endswith((".h", ".cpp")):
+            continue
+
+        if __ignore_path(regex_to_ignore, file_path):
             continue
 
         if identify_test_class in file_path:
@@ -147,6 +151,12 @@ def __search_source_file_by_test_file(path_source, file_path):
     path = __search_files_in_directory(class_name+".cpp", path_source)
     path = os.path.relpath(path[0], path_source)
     return path
+
+def __ignore_path(regex_to_ignore, file_path):
+    for regex in regex_to_ignore:
+        if re.match(regex, file_path):
+            return True
+    return False
 
 def __minimum_coverage_verify(fullPath, minimum_coverage, minimum_coverage_by_project):
     minimum = 0    
