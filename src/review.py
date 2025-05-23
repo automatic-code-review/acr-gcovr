@@ -142,6 +142,8 @@ def __search_project_root(build_system, fixed_path, relative_path, file_search):
     return None  
 
 def __search_source_file_by_test_file(path_source, file_path):
+    print(f"Path file: {file_path}")
+    print(f"Path source: {path_source}")
     class_name = _class_name(file_path)
     class_name = match.group(1) if (match := re.search(r"(?:[^_]+_)?(.+?)test\.cpp", class_name)) else None
     path = __search_files_in_directory(class_name+".cpp", path_source)
