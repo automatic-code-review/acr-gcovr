@@ -13,6 +13,7 @@ Arquivo config.json
         "minimumCoverage": 80,
         "identifyTestClass": "/test/",
         "onlyNewFiles": true,
+        "regexToIgnore": [ ".*my_path_to_ignore.*"],
         "minimumCoverageByProject": [
             {
                 "id": 1,
