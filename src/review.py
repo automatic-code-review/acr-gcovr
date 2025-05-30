@@ -89,7 +89,7 @@ def review(config):
         minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
         filter_path = ".*"+os.path.relpath(path_source+"/"+file_path, root_path)
         json_output = class_name_without_extension+".json"    
-        command = f'gcovr --rooti {root_path} --filter "{filter_path}" --json-summary {json_output} {gcovr_run_path}'
+        command = f'gcovr --root {root_path} --filter "{filter_path}" --json-summary {json_output} {gcovr_run_path}'
         print(command)
         result = subprocess.run(command, shell=True, cwd=gcovr_run_path, capture_output=True, text=True)
 
