@@ -27,16 +27,16 @@ def review(config):
     only_new_files = config["configs"]["onlyNewFiles"]
     changes = config['merge']['changes']
     regex_to_ignore = config["configs"]["regexToIgnore"]
+    is_group_message = config["configs"]["groupMessage"]
     
     comments = []
 
-    gcovr_run_path = "/tmp/gcovr-"+str(uuid.uuid4())
+    files_to_check = []
 
-    os.makedirs(gcovr_run_path, exist_ok=True)          
+    messages_to_comment = {}
 
-    for change in changes:
-        __remove_files(gcovr_run_path)
-
+    print("--carregando arquivos para processamento")
+    for change in changes:        
         if change['deleted_file']:
             continue
 
@@ -44,6 +44,7 @@ def review(config):
             continue
 
         file_path = change['new_path']
+
         if not file_path.lower().endswith((".h", ".cpp")):
             continue
 
@@ -52,43 +53,72 @@ def review(config):
 
         if identify_test_class in file_path:
             file_path = __search_source_file_by_test_file(path_source, file_path)
-            if not file_path:
-                continue
+
+        if file_path is not None and not any(obj.get("new_path") == file_path for obj in files_to_check):
+            print(file_path)
+            files_to_check.append({
+                "new_path": file_path
+            })
+
+    gcovr_run_path = "/tmp/gcovr-"+str(uuid.uuid4())
+
+    os.makedirs(gcovr_run_path, exist_ok=True)          
+
+    print("--processando coverage")
+    for change in files_to_check:
+        __remove_files(gcovr_run_path)
+
+        file_path = change['new_path']
 
         class_name = _class_name(file_path)
         class_name_without_extension = __remove_extension_file(class_name)
         
         root_path = __search_project_root(build_system, path_source, file_path, class_name)
         if not root_path:
-            comments.append(__generate_comment(file_path, "diretório root não foi encontrado"))
+            messages_to_comment[file_path] = "Diretório root não foi encontrado"
             continue
 
         files_to_generate_coverage = __search_files_in_directory((class_name_without_extension+".gcda", class_name_without_extension+".gcno"), root_path)
         if not files_to_generate_coverage:
+            messages_to_comment[file_path] = "Arquivos .gcda .gcno não foram encontrados"
             continue
 
         for file in files_to_generate_coverage:
             shutil.copy(file, gcovr_run_path)
 
-        filter_path = ".*"+os.path.relpath(path_source+"/"+__remove_extension_file(file_path), root_path)+".*"
+        filter_path = ".*"+os.path.relpath(path_source+"/"+file_path, root_path)
         json_output = class_name_without_extension+".json"    
         command = f'gcovr --root {root_path} --filter "{filter_path}" --json-summary {json_output} {gcovr_run_path}'
+        print(command)
         result = subprocess.run(command, shell=True, cwd=gcovr_run_path, capture_output=True, text=True)
 
         if result.returncode == 0:
-            percent = __process_json(gcovr_run_path+"/"+json_output, class_name)
-            minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
-            if percent < minimum:
-                comment_description = comment_description.replace("${PERCENT_MINIMUM_COVERAGE}", str(minimum))
-                comment_description = comment_description.replace("${PERCENT_COVERAGE}", str(percent))
-                if warning:
-                    comment_description += warning
-                comments.append(__generate_comment(file_path, comment_description))
+            percent, line_total = __process_json(gcovr_run_path+"/"+json_output, class_name)
+            if line_total > 0:            
+                minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
+                if percent < minimum:
+                    comment_description = comment_description.replace("${PERCENT_MINIMUM_COVERAGE}", str(minimum))
+                    comment_description = comment_description.replace("${PERCENT_COVERAGE}", str(percent))
+                    if warning:
+                        comment_description += warning
+                    messages_to_comment[file_path] = comment_description
+            else:
+                print(f"line_total 0 {file_path}")
         else:
-            comments.append(__generate_comment(file_path, f"Erro na geração do coverage, gcovr error code: {result.returncode}"))
+            messages_to_comment[file_path] = f"Erro na geração do coverage, gcovr error code: {result.returncode}"
 
     if os.path.exists(gcovr_run_path):
         shutil.rmtree(gcovr_run_path)
+
+    messages_formated = []
+    for key, value in messages_to_comment.items():        
+        if is_group_message:
+            messages_formated.append(f"{key}<br>{value}")
+        else:
+            comments.append(__generate_comment(key, value))
+
+    if messages_formated:
+        comments.append(__generate_comment(None, "<br><br>".join(messages_formated)))
 
     return comments
 
@@ -101,7 +131,7 @@ def __process_json(coverage_file_name, class_name):
          data = json.load(file)
     files = data["files"]
     linePercentValue = next((item["line_percent"] for item in files if item["filename"].endswith(f"/{class_name}")), 0)
-    return linePercentValue
+    return linePercentValue, data['line_total']
 
 def __remove_files(gcovr_run_path):
     for file_name in os.listdir(gcovr_run_path):
@@ -171,14 +201,14 @@ def __minimum_coverage_verify(fullPath, minimum_coverage, minimum_coverage_by_pr
             break
 
     if not minimum:
-        return minimum_coverage, "<br><br>Warning: foi utilizado para validação o percentual mínimo de cobertura geral, pois não foi identificado na configuração o percentual de cobertura mínimo para o projeto"
+        return minimum_coverage, "<br>Warning: foi utilizado para validação o percentual mínimo de cobertura geral, pois não foi identificado na configuração o percentual de cobertura mínimo para o projeto"
     
     return minimum, ""
 
-def __generate_comment(file_path, comment_description):
+def __generate_comment(comment_path, comment_description):
     return commons.comment_create(
         comment_id=commons.comment_generate_id(comment_description),
-        comment_path=file_path,
+        comment_path=comment_path,
         comment_description=comment_description,
         comment_snipset=True,
         comment_end_line=1,

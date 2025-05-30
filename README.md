@@ -14,6 +14,7 @@ Arquivo config.json
         "identifyTestClass": "/test/",
         "onlyNewFiles": true,
         "regexToIgnore": [ ".*my_path_to_ignore.*"],
+        "groupMessage": false,
         "minimumCoverageByProject": [
             {
                 "id": 1,
