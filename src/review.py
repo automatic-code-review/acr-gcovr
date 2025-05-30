@@ -78,9 +78,11 @@ def review(config):
             messages_to_comment[file_path] = "Diretório root não foi encontrado"
             continue
 
+        minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
+
         files_to_generate_coverage = __search_files_in_directory((class_name_without_extension+".gcda", class_name_without_extension+".gcno"), root_path)
-        if not files_to_generate_coverage:
-            messages_to_comment[file_path] = "Arquivos .gcda .gcno não foram encontrados"
+        if not files_to_generate_coverage:            
+            messages_to_comment[file_path] = __generate_comment_description(comment_description, minimum, 0, warning)
             continue
 
         for file in files_to_generate_coverage:
@@ -95,13 +97,8 @@ def review(config):
         if result.returncode == 0:
             percent, line_total = __process_json(gcovr_run_path+"/"+json_output, class_name)
             if line_total > 0:            
-                minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
                 if percent < minimum:
-                    comment_description = comment_description.replace("${PERCENT_MINIMUM_COVERAGE}", str(minimum))
-                    comment_description = comment_description.replace("${PERCENT_COVERAGE}", str(percent))
-                    if warning:
-                        comment_description += warning
-                    messages_to_comment[file_path] = comment_description
+                    messages_to_comment[file_path] = __generate_comment_description(comment_description, minimum, percent, warning)
             else:
                 print(f"line_total 0 {file_path}")
         else:
@@ -149,6 +146,13 @@ def __search_files_in_directory(files_search, start_path):
 
 def __remove_extension_file(file):
     return os.path.splitext(file)[0]
+
+def __generate_comment_description(comment_description, minimum, percent, warning):
+    comment_description = comment_description.replace("${PERCENT_MINIMUM_COVERAGE}", str(minimum))
+    comment_description = comment_description.replace("${PERCENT_COVERAGE}", str(percent))
+    if warning:
+        comment_description += warning
+    return comment_description
 
 def __search_project_root(build_system, fixed_path, relative_path, file_search):
     parts = relative_path.split(os.sep)
