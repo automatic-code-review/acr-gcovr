@@ -78,16 +78,15 @@ def review(config):
             messages_to_comment[file_path] = "Diretório root não foi encontrado"
             continue
 
-        minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
-
         files_to_generate_coverage = __search_files_in_directory((class_name_without_extension+".gcda", class_name_without_extension+".gcno"), root_path)
-        if not files_to_generate_coverage:            
-            messages_to_comment[file_path] = __generate_comment_description(comment_description, minimum, 0, warning)
+        if not files_to_generate_coverage:
+            print(f"nenhum arquivo .gcda e .gcno foi encontrado para {file_path}")
             continue
 
         for file in files_to_generate_coverage:
             shutil.copy(file, gcovr_run_path)
 
+        minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
         filter_path = ".*"+os.path.relpath(path_source+"/"+file_path, root_path)
         json_output = class_name_without_extension+".json"    
         command = f'gcovr --root {root_path} --filter "{filter_path}" --json-summary {json_output} {gcovr_run_path}'
@@ -102,8 +101,10 @@ def review(config):
             else:
                 print(f"line_total 0 {file_path}")
         else:
-            messages_to_comment[file_path] = f"Erro na geração do coverage, gcovr error code: {result.returncode}"
-
+            print(f"stdout: {result.stdout}")
+            print(f"stderr: {result.stderr}")
+            messages_to_comment[file_path] = f"Erro na geração do coverage para '{file_path}': gcovr error code {result.returncode}"
+            
     if os.path.exists(gcovr_run_path):
         shutil.rmtree(gcovr_run_path)
 
