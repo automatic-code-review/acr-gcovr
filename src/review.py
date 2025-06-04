@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 import re
-import json
+import csv
 import automatic_code_review_commons as commons
 from enum import Enum
 import glob
@@ -87,19 +87,20 @@ def review(config):
             shutil.copy(file, gcovr_run_path)
 
         minimum, warning = __minimum_coverage_verify(path_source+"/"+file_path, minimum_coverage, minimum_coverage_by_project)
-        filter_path = ".*"+os.path.relpath(path_source+"/"+file_path, root_path)
-        json_output = class_name_without_extension+".json"    
-        command = f'gcovr --root {root_path} --filter "{filter_path}" --json-summary {json_output} {gcovr_run_path}'
+        relative_path = os.path.relpath(path_source+"/"+file_path, root_path)
+        csv_output = class_name_without_extension+".csv"    
+        command = f'gcovr --root {root_path} --filter ".*{relative_path}" --csv {csv_output} {gcovr_run_path}'
         print(command)
         result = subprocess.run(command, shell=True, cwd=gcovr_run_path, capture_output=True, text=True)
 
         if result.returncode == 0:
-            percent, line_total = __process_json(gcovr_run_path+"/"+json_output, class_name)
+            line_percent, line_total = __get_coverage_from_csv(gcovr_run_path+"/"+csv_output, relative_path)            
             if line_total > 0:            
-                if percent < minimum:
-                    messages_to_comment[file_path] = __generate_comment_description(comment_description, minimum, percent, warning)
+                if line_percent < minimum:
+                    messages_to_comment[file_path] = __generate_comment_description(comment_description, minimum, line_percent, warning)
             else:
                 print(f"line_total 0 {file_path}")
+
         else:
             print(f"stdout: {result.stdout}")
             print(f"stderr: {result.stderr}")
@@ -123,13 +124,6 @@ def review(config):
 def _class_name(file_path):
     splitPath = file_path.split(os.sep)
     return str(splitPath[len(splitPath)-1])
-
-def __process_json(coverage_file_name, class_name):
-    with open(coverage_file_name, "r", encoding="utf-8") as file:
-         data = json.load(file)
-    files = data["files"]
-    linePercentValue = next((item["line_percent"] for item in files if item["filename"].endswith(f"/{class_name}")), 0)
-    return linePercentValue, data['line_total']
 
 def __remove_files(gcovr_run_path):
     for file_name in os.listdir(gcovr_run_path):
@@ -210,6 +204,16 @@ def __minimum_coverage_verify(fullPath, minimum_coverage, minimum_coverage_by_pr
     
     return minimum, ""
 
+def __get_coverage_from_csv(coverage_file_name, class_name):
+    with open(coverage_file_name, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:            
+            if class_name == row['filename']:
+                line_total = int(row['line_total'])
+                line_percent = float(row['line_percent'])*100
+                return line_percent, line_total
+    return 0, 0
+
 def __generate_comment(comment_path, comment_description):
     return commons.comment_create(
         comment_id=commons.comment_generate_id(comment_description),
@@ -219,3 +223,5 @@ def __generate_comment(comment_path, comment_description):
         comment_end_line=1,
         comment_start_line=1,
         comment_language="c++")
+
+
