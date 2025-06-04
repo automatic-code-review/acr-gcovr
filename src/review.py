@@ -223,5 +223,3 @@ def __generate_comment(comment_path, comment_description):
         comment_end_line=1,
         comment_start_line=1,
         comment_language="c++")
-
-
