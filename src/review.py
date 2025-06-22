@@ -180,6 +180,8 @@ def __search_source_file_by_test_file(path_source, file_path):
     class_name = _class_name(file_path)
     class_name = match.group(1) if (match := re.search(r"(?:[^_]+_)?(.+?)test\.cpp", class_name)) else None
     path = __search_files_in_directory(class_name+".cpp", path_source)
+    if len(path) == 0:
+        return None
     path = os.path.relpath(path[0], path_source)
     return path
 
