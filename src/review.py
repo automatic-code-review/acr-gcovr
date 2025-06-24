@@ -175,10 +175,11 @@ def __search_project_root(build_system, fixed_path, relative_path, file_search):
     return None  
 
 def __search_source_file_by_test_file(path_source, file_path):
-    print(f"Path file: {file_path}")
-    print(f"Path source: {path_source}")
+    print(f"path file: {file_path}")
+    print(f"path source: {path_source}")
     class_name = _class_name(file_path)
     class_name = match.group(1) if (match := re.search(r"(?:[^_]+_)?(.+?)test\.cpp", class_name)) else None
+    print(f"class name: {class_name}")
     path = __search_files_in_directory(class_name+".cpp", path_source)
     path = os.path.relpath(path[0], path_source)
     return path
@@ -210,7 +211,7 @@ def __get_coverage_from_csv(coverage_file_name, class_name):
         for row in reader:            
             if class_name == row['filename']:
                 line_total = int(row['line_total'])
-                line_percent = float(row['line_percent'])*100
+                line_percent = round(float(row['line_percent'])*100,2)
                 return line_percent, line_total
     return 0, 0
 
