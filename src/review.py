@@ -179,6 +179,11 @@ def __search_source_file_by_test_file(path_source, file_path):
     print(f"path source: {path_source}")
     class_name = _class_name(file_path)
     class_name = match.group(1) if (match := re.search(r"(?:[^_]+_)?(.+?)test\.cpp", class_name)) else None
+
+    if class_name is None:
+        print(f"class name not found")
+        return None
+
     print(f"class name: {class_name}")
     path = __search_files_in_directory(class_name+".cpp", path_source)
     if len(path) == 0:
